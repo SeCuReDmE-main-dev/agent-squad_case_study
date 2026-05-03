@@ -6,10 +6,11 @@ export { LexBotAgent, LexBotAgentOptions } from './agents/lexBotAgent';
 export { OpenAIAgent, OpenAIAgentOptions } from './agents/openAIAgent';
 export { AnthropicAgent, AnthropicAgentOptions, AnthropicAgentOptionsWithAuth } from './agents/anthropicAgent';
 export { Agent, AgentOptions } from './agents/agent';
-export { Classifier, ClassifierResult } from './classifiers/classifier';
+export { Classifier, ClassifierResult, NeutrosophicClassifierResult } from './classifiers/classifier';
 export { ChainAgent, ChainAgentOptions } from './agents/chainAgent';
 export {BedrockFlowsAgent, BedrockFlowsAgentOptions} from './agents/bedrockFlowsAgent';
 export { SupervisorAgent, SupervisorAgentOptions } from './agents/supervisorAgent';
+export { NeutrosophicSupervisor } from './agents/neutrosophicSupervisor';
 export { AgentResponse } from './agents/agent';
 export { AgentCallbacks } from './agents/agent';
 
@@ -35,6 +36,19 @@ export { AgentOverlapAnalyzer, AnalysisResult } from "./agentOverlapAnalyzer";
 export { ConversationMessage, ParticipantRole } from "./types"
 export { AgentTools, AgentTool} from "./utils/tool"
 export { isClassifierToolInput } from './utils/helpers'
+export {
+    Triplet,
+    nNorm,
+    nConorm,
+    negate,
+    neutrosophicConsensus,
+    neutrosophicEvidenceConsensus,
+    DecisionAction,
+    DecisionThresholds,
+    decide,
+    scoreTextResponse,
+    scoreClassifierConfidence
+} from './neutrosophic';
 
 
 import { MAOTS_VERSION } from "./common/src/version";

@@ -6,7 +6,7 @@ from agent_squad.types import (ConversationMessage,
                                             ParticipantRole,
                                             AgentSquadConfig,
                                             TimestampedMessage)
-from agent_squad.classifiers import Classifier,ClassifierResult, NeutrosophicClassifierResult
+from agent_squad.classifiers import Classifier, ClassifierResult, NeutrosophicClassifierResult
 from agent_squad.agents import (Agent,
                                              AgentStreamResponse,
                                              AgentResponse,
@@ -140,7 +140,7 @@ class AgentSquad:
                                user_id: str,
                                session_id: str,
                                classifier_result: ClassifierResult,
-                               additional_params: dict[str, str] | None = None,
+                               additional_params: dict[str, Any] | None = None,
                                stream_response: bool | None = False # wether to stream back the response from the agent
     ) -> AgentResponse:
         """Process agent response and handle chat storage."""
@@ -246,7 +246,7 @@ class AgentSquad:
                             user_input: str,
                             user_id: str,
                             session_id: str,
-                            additional_params: dict[str, str] | None = None,
+                            additional_params: dict[str, Any] | None = None,
                             stream_response: bool | None = False,
                             use_neutrosophic: bool = False
     ) -> AgentResponse:
@@ -344,7 +344,7 @@ class AgentSquad:
                         user_input: str,
                         user_id: str,
                         session_id: str,
-                        additional_params: dict[str, str]) -> AgentProcessingResult:
+                        additional_params: dict[str, Any] | None = None) -> AgentProcessingResult:
         metadata_params = dict(additional_params or {})
         base_metadata = AgentProcessingResult(
             user_input=user_input,

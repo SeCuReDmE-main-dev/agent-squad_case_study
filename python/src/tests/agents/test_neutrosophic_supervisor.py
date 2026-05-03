@@ -95,7 +95,7 @@ async def test_neutrosophic_supervisor_raises_indeterminacy_for_conflicting_evid
 
 
 @pytest.mark.asyncio
-async def test_neutrosophic_supervisor_preserves_no_match_message(mock_boto3_client):
+async def test_neutrosophic_supervisor_returns_structured_no_match_response(mock_boto3_client):
     lead_agent = make_agent("Supervisor", "Lead response")
     supervisor = NeutrosophicSupervisor(SupervisorAgentOptions(
         name="SupervisorAgent",
@@ -105,9 +105,33 @@ async def test_neutrosophic_supervisor_preserves_no_match_message(mock_boto3_cli
         storage=mock_storage(),
     ))
 
-    response = await supervisor.send_messages([])
+    response = await supervisor.send_messages([
+        {"recipient": "Unknown Agent", "content": "Help"},
+    ])
 
-    assert response == "No agent matches for the request:[]"
+    assert "<neutrosophic_consensus>" in response
+    assert "action: CLARIFY" in response
+    assert "T: 0.00" in response
+    assert "I: 1.00" in response
+    assert "<agent_responses>" in response
+
+
+@pytest.mark.asyncio
+async def test_neutrosophic_supervisor_rejects_invalid_messages(mock_boto3_client):
+    lead_agent = make_agent("Supervisor", "Lead response")
+    supervisor = NeutrosophicSupervisor(SupervisorAgentOptions(
+        name="SupervisorAgent",
+        description="My Supervisor agent description",
+        lead_agent=lead_agent,
+        team=[],
+        storage=mock_storage(),
+    ))
+
+    with pytest.raises(ValueError, match="recipient must be a non-empty string"):
+        await supervisor.send_messages([{"recipient": "", "content": "Help"}])
+
+    with pytest.raises(ValueError, match="content must be a non-empty string"):
+        await supervisor.send_messages([{"recipient": "Agent", "content": ""}])
 
 
 @pytest.mark.asyncio

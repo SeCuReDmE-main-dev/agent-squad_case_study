@@ -18,14 +18,15 @@ export interface SupervisorAgentOptions extends AgentOptions{
 export class SupervisorAgent extends Agent {
   private static readonly DEFAULT_TOOL_MAX_RECURSIONS = 40;
 
-  private leadAgent: BedrockLLMAgent | AnthropicAgent;
-  private team: Agent[];
-  private storage: ChatStorage;
-  private trace: boolean;
-  private userId: string = "";
-  private sessionId: string = "";
-  private supervisorTools: AgentTools;
-  private promptTemplate: string;
+  protected leadAgent: BedrockLLMAgent | AnthropicAgent;
+  protected team: Agent[];
+  protected storage: ChatStorage;
+  protected trace: boolean;
+  protected userId: string = "";
+  protected sessionId: string = "";
+  protected additionalParams: Record<string, any> = {};
+  protected supervisorTools: AgentTools;
+  protected promptTemplate: string;
 
   constructor(options: SupervisorAgentOptions) {
     if (
@@ -177,7 +178,7 @@ When communicating with other agents, including the User, please follow these gu
     return accumulatedText;
   }
 
-  private async sendMessage(
+  protected async sendMessage(
     agent: Agent,
     content: string,
     userId: string,
@@ -259,7 +260,7 @@ When communicating with other agents, including the User, please follow these gu
     }
   }
 
-  private async sendMessages(
+  protected async sendMessages(
     messages: Array<{ recipient: string; content: string }>
   ): Promise<string> {
     try {
@@ -272,7 +273,7 @@ When communicating with other agents, including the User, please follow these gu
                 message.content,
                 this.userId,
                 this.sessionId,
-                {}
+                this.additionalParams
               )
             : null;
         })
@@ -312,11 +313,12 @@ When communicating with other agents, including the User, please follow these gu
     userId: string,
     sessionId: string,
     chatHistory: ConversationMessage[],
-    additionalParams?: Record<string, string>
+    additionalParams?: Record<string, any>
   ): Promise<ConversationMessage | AsyncIterable<any>> {
     try {
       this.userId = userId;
       this.sessionId = sessionId;
+      this.additionalParams = additionalParams || {};
 
       const agentsHistory = await this.storage.fetchAllChats(userId, sessionId);
       const agentsMemory = this.formatAgentsMemory(agentsHistory);
@@ -330,7 +332,7 @@ When communicating with other agents, including the User, please follow these gu
         userId,
         sessionId,
         chatHistory,
-        additionalParams
+        this.additionalParams
       );
     } catch (error) {
       Logger.logger.error("Error in processRequest:", error);

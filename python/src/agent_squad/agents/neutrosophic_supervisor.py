@@ -10,6 +10,7 @@ class NeutrosophicSupervisor(SupervisorAgent):
 
     async def send_messages(self, messages: list[dict[str, str]]) -> str:
         """Process messages and return agent responses with neutrosophic consensus."""
+        self._validate_messages(messages)
         tasks = [
             asyncio.create_task(
                 asyncio.to_thread(
@@ -24,7 +25,11 @@ class NeutrosophicSupervisor(SupervisorAgent):
         ]
 
         if not tasks:
-            return f"No agent matches for the request:{str(messages)}"
+            return self._format_neutrosophic_response(
+                [],
+                Triplet(T=0.0, I=1.0, F=0.0),
+                decide(Triplet(T=0.0, I=1.0, F=0.0)).value,
+            )
 
         scored_responses = await asyncio.gather(*tasks)
         consensus = neutrosophic_evidence_consensus(score for _, _, score in scored_responses)
@@ -43,6 +48,22 @@ class NeutrosophicSupervisor(SupervisorAgent):
         prefix = f"{agent.name}: "
         response_text = raw_response[len(prefix):] if raw_response.startswith(prefix) else raw_response
         return agent.name, response_text, score_text_response(response_text)
+
+    @staticmethod
+    def _validate_messages(messages: list[dict[str, str]]) -> None:
+        if not isinstance(messages, list):
+            raise TypeError("messages must be a list")
+
+        for index, message in enumerate(messages):
+            if not isinstance(message, dict):
+                raise TypeError(f"messages[{index}] must be a dictionary")
+
+            recipient = message.get("recipient")
+            content = message.get("content")
+            if not isinstance(recipient, str) or not recipient.strip():
+                raise ValueError(f"messages[{index}].recipient must be a non-empty string")
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError(f"messages[{index}].content must be a non-empty string")
 
     @staticmethod
     def _format_neutrosophic_response(scored_responses, consensus, action: str) -> str:
