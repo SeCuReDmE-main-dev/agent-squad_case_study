@@ -10,7 +10,7 @@ from agent_squad.types import (
     AgentSquadConfig,
     TimestampedMessage
 )
-from agent_squad.classifiers import Classifier, ClassifierResult
+from agent_squad.classifiers import Classifier, ClassifierResult, NeutrosophicClassifierResult
 from agent_squad.agents import (
     Agent,
     AgentStreamResponse,
@@ -220,6 +220,45 @@ async def test_route_request_success(orchestrator, mock_agent):
     assert response.metadata.agent_id == mock_agent.id
 
 @pytest.mark.asyncio
+async def test_route_request_with_neutrosophic_metadata(orchestrator, mock_agent):
+    classifier_result = ClassifierResult(selected_agent=mock_agent, confidence=0.8)
+    orchestrator.classifier.classify.return_value = classifier_result
+    mock_agent.process_request.return_value = ConversationMessage(
+        role=ParticipantRole.ASSISTANT.value,
+        content=[{"text": "Test response"}]
+    )
+
+    response = await orchestrator.route_request(
+        "test input",
+        "user1",
+        "session1",
+        use_neutrosophic=True,
+    )
+
+    assert response.metadata.additional_params["neutrosophic"]["t_score"] == 0.8
+    assert response.metadata.additional_params["neutrosophic"]["i_score"] == pytest.approx(0.2)
+    assert response.metadata.additional_params["neutrosophic"]["f_score"] == 0
+    assert response.metadata.additional_params["neutrosophic"]["action"] == "CONFIDENCE"
+
+@pytest.mark.asyncio
+async def test_route_request_with_neutrosophic_no_agent_metadata(orchestrator):
+    orchestrator.classifier.classify.return_value = ClassifierResult(selected_agent=None, confidence=0.1)
+    orchestrator.config.USE_DEFAULT_AGENT_IF_NONE_IDENTIFIED = False
+
+    response = await orchestrator.route_request(
+        "test input",
+        "user1",
+        "session1",
+        use_neutrosophic=True,
+    )
+
+    assert response.metadata.agent_id == "no_agent_selected"
+    assert response.metadata.additional_params["error_type"] == "classification_failed"
+    assert response.metadata.additional_params["neutrosophic"]["t_score"] == 0
+    assert response.metadata.additional_params["neutrosophic"]["i_score"] == 0.9
+    assert response.metadata.additional_params["neutrosophic"]["action"] == "CLARIFY"
+
+@pytest.mark.asyncio
 async def test_route_request_error(orchestrator):
     orchestrator.classifier.classify.side_effect = Exception("Test error")
 
@@ -321,6 +360,27 @@ def test_create_metadata(orchestrator, mock_agent):
     assert metadata.user_id == "user1"
     assert metadata.session_id == "session1"
     assert metadata.additional_params == {"param1": "value1"}
+
+def test_create_metadata_enriches_neutrosophic_result(orchestrator, mock_agent):
+    classifier_result = NeutrosophicClassifierResult(
+        selected_agent=mock_agent,
+        confidence=0.9,
+        t_score=0.9,
+        i_score=0.1,
+        f_score=0,
+    )
+
+    metadata = orchestrator.create_metadata(
+        classifier_result,
+        "test input",
+        "user1",
+        "session1",
+        {"param1": "value1"}
+    )
+
+    assert metadata.additional_params["param1"] == "value1"
+    assert metadata.additional_params["neutrosophic"]["t_score"] == 0.9
+    assert metadata.additional_params["neutrosophic"]["action"] == "CONFIDENCE"
 
 def test_create_metadata_no_agent(orchestrator):
     metadata = orchestrator.create_metadata(

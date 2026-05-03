@@ -6,11 +6,12 @@ from agent_squad.types import (ConversationMessage,
                                             ParticipantRole,
                                             AgentSquadConfig,
                                             TimestampedMessage)
-from agent_squad.classifiers import Classifier,ClassifierResult
+from agent_squad.classifiers import Classifier,ClassifierResult, NeutrosophicClassifierResult
 from agent_squad.agents import (Agent,
                                              AgentStreamResponse,
                                              AgentResponse,
                                              AgentProcessingResult)
+from agent_squad.neutrosophic import Triplet, decide
 from agent_squad.storage import ChatStorage
 from agent_squad.storage import InMemoryChatStorage
 try:
@@ -246,13 +247,16 @@ class AgentSquad:
                             user_id: str,
                             session_id: str,
                             additional_params: dict[str, str] | None = None,
-                            stream_response: bool | None = False
+                            stream_response: bool | None = False,
+                            use_neutrosophic: bool = False
     ) -> AgentResponse:
         """Route user request to appropriate agent."""
         self.execution_times.clear()
 
         try:
             classifier_result = await self.classify_request(user_input, user_id, session_id)
+            if use_neutrosophic:
+                classifier_result = self.to_neutrosophic_classifier_result(classifier_result)
 
             if not classifier_result.selected_agent:
                 return AgentResponse(
@@ -286,6 +290,29 @@ class AgentSquad:
 
         finally:
             self.logger.print_execution_times(self.execution_times)
+
+    @staticmethod
+    def to_neutrosophic_classifier_result(classifier_result: ClassifierResult) -> NeutrosophicClassifierResult:
+        if isinstance(classifier_result, NeutrosophicClassifierResult):
+            return classifier_result
+
+        confidence = max(0, min(1, float(classifier_result.confidence)))
+        if classifier_result.selected_agent:
+            return NeutrosophicClassifierResult(
+                selected_agent=classifier_result.selected_agent,
+                confidence=classifier_result.confidence,
+                t_score=confidence,
+                i_score=1 - confidence,
+                f_score=0,
+            )
+
+        return NeutrosophicClassifierResult(
+            selected_agent=None,
+            confidence=classifier_result.confidence,
+            t_score=0,
+            i_score=max(1 - confidence, 0.7),
+            f_score=0,
+        )
 
 
     def print_intent(self, user_input: str, intent_classifier_result: ClassifierResult) -> None:
@@ -324,13 +351,14 @@ class AgentSquad:
                         user_id: str,
                         session_id: str,
                         additional_params: dict[str, str]) -> AgentProcessingResult:
+        metadata_params = dict(additional_params or {})
         base_metadata = AgentProcessingResult(
             user_input=user_input,
             agent_id="no_agent_selected",
             agent_name="No Agent",
             user_id=user_id,
             session_id=session_id,
-            additional_params=additional_params
+            additional_params=metadata_params
         )
 
         if not intent_classifier_result or not intent_classifier_result.selected_agent:
@@ -341,6 +369,19 @@ class AgentSquad:
         else:
             base_metadata.agent_id = intent_classifier_result.selected_agent.id
             base_metadata.agent_name = intent_classifier_result.selected_agent.name
+
+        if isinstance(intent_classifier_result, NeutrosophicClassifierResult):
+            triplet = Triplet(
+                T=intent_classifier_result.t_score,
+                I=intent_classifier_result.i_score,
+                F=intent_classifier_result.f_score,
+            )
+            base_metadata.additional_params['neutrosophic'] = {
+                't_score': triplet.T,
+                'i_score': triplet.I,
+                'f_score': triplet.F,
+                'action': decide(triplet).value,
+            }
 
         return base_metadata
 
