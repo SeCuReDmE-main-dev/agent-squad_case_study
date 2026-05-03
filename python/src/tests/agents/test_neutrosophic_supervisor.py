@@ -71,6 +71,30 @@ async def test_neutrosophic_supervisor_adds_consensus_to_agent_responses(mock_bo
 
 
 @pytest.mark.asyncio
+async def test_neutrosophic_supervisor_raises_indeterminacy_for_conflicting_evidence(mock_boto3_client):
+    lead_agent = make_agent("Supervisor", "Lead response")
+    team = [
+        make_agent("Clear Agent", "The task completed successfully with a clear answer."),
+        make_agent("Error Agent", "The task failed with an invalid response and an error."),
+    ]
+    supervisor = NeutrosophicSupervisor(SupervisorAgentOptions(
+        name="SupervisorAgent",
+        description="My Supervisor agent description",
+        lead_agent=lead_agent,
+        team=team,
+        storage=mock_storage(),
+    ))
+
+    response = await supervisor.send_messages([
+        {"recipient": "Clear Agent", "content": "Help"},
+        {"recipient": "Error Agent", "content": "Help"},
+    ])
+
+    assert "action: CLARIFY" in response
+    assert "Error Agent:" in response
+
+
+@pytest.mark.asyncio
 async def test_neutrosophic_supervisor_preserves_no_match_message(mock_boto3_client):
     lead_agent = make_agent("Supervisor", "Lead response")
     supervisor = NeutrosophicSupervisor(SupervisorAgentOptions(

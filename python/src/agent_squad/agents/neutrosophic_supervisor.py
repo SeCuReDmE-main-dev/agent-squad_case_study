@@ -1,5 +1,8 @@
+import asyncio
+
+from agent_squad.agents.agent import Agent
 from agent_squad.agents.supervisor_agent import SupervisorAgent, SupervisorAgentOptions
-from agent_squad.neutrosophic import decide, neutrosophic_consensus, score_text_response
+from agent_squad.neutrosophic import Triplet, decide, neutrosophic_evidence_consensus, score_text_response
 
 
 class NeutrosophicSupervisor(SupervisorAgent):
@@ -7,42 +10,46 @@ class NeutrosophicSupervisor(SupervisorAgent):
 
     async def send_messages(self, messages: list[dict[str, str]]) -> str:
         """Process messages and return agent responses with neutrosophic consensus."""
-        raw_response = await super().send_messages(messages)
-        if not raw_response or raw_response.startswith("No agent matches"):
-            return raw_response
-
-        scored_responses = [
-            (response, score_text_response(response))
-            for response in self._split_agent_responses(raw_response)
+        tasks = [
+            asyncio.create_task(
+                asyncio.to_thread(
+                    self._send_scored_message,
+                    agent,
+                    message.get('content'),
+                )
+            )
+            for agent in self.team
+            for message in messages
+            if agent.name == message.get('recipient')
         ]
-        consensus = neutrosophic_consensus(score for _, score in scored_responses)
+
+        if not tasks:
+            return f"No agent matches for the request:{str(messages)}"
+
+        scored_responses = await asyncio.gather(*tasks)
+        consensus = neutrosophic_evidence_consensus(score for _, _, score in scored_responses)
         action = decide(consensus)
 
         return self._format_neutrosophic_response(scored_responses, consensus, action.value)
 
-    def _split_agent_responses(self, raw_response: str) -> list[str]:
-        marker_positions: list[int] = []
-        for agent in self.team:
-            marker = f"{agent.name}: "
-            start = raw_response.find(marker)
-            while start != -1:
-                marker_positions.append(start)
-                start = raw_response.find(marker, start + len(marker))
-
-        marker_positions = sorted(set(marker_positions))
-        responses = []
-        for index, start in enumerate(marker_positions):
-            end = marker_positions[index + 1] if index + 1 < len(marker_positions) else len(raw_response)
-            responses.append(raw_response[start:end].strip())
-
-        return responses or [raw_response]
+    def _send_scored_message(self, agent: Agent, content: str) -> tuple[str, str, Triplet]:
+        raw_response = self.send_message(
+            agent=agent,
+            content=content,
+            user_id=self.user_id,
+            session_id=self.session_id,
+            additional_params=self.additional_params,
+        )
+        prefix = f"{agent.name}: "
+        response_text = raw_response[len(prefix):] if raw_response.startswith(prefix) else raw_response
+        return agent.name, response_text, score_text_response(response_text)
 
     @staticmethod
     def _format_neutrosophic_response(scored_responses, consensus, action: str) -> str:
         score_lines = [
-            f"- {response}\n"
+            f"- {agent_name}: {response_text}\n"
             f"  T={score.T:.2f}, I={score.I:.2f}, F={score.F:.2f}"
-            for response, score in scored_responses
+            for agent_name, response_text, score in scored_responses
         ]
 
         return (

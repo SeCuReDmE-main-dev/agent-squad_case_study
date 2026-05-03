@@ -11,7 +11,7 @@ from agent_squad.agents import (Agent,
                                              AgentStreamResponse,
                                              AgentResponse,
                                              AgentProcessingResult)
-from agent_squad.neutrosophic import Triplet, decide
+from agent_squad.neutrosophic import Triplet, decide, score_classifier_confidence
 from agent_squad.storage import ChatStorage
 from agent_squad.storage import InMemoryChatStorage
 try:
@@ -296,22 +296,16 @@ class AgentSquad:
         if isinstance(classifier_result, NeutrosophicClassifierResult):
             return classifier_result
 
-        confidence = max(0, min(1, float(classifier_result.confidence)))
-        if classifier_result.selected_agent:
-            return NeutrosophicClassifierResult(
-                selected_agent=classifier_result.selected_agent,
-                confidence=classifier_result.confidence,
-                t_score=confidence,
-                i_score=1 - confidence,
-                f_score=0,
-            )
-
+        triplet = score_classifier_confidence(
+            classifier_result.confidence,
+            selected=bool(classifier_result.selected_agent),
+        )
         return NeutrosophicClassifierResult(
-            selected_agent=None,
+            selected_agent=classifier_result.selected_agent,
             confidence=classifier_result.confidence,
-            t_score=0,
-            i_score=max(1 - confidence, 0.7),
-            f_score=0,
+            t_score=triplet.T,
+            i_score=triplet.I,
+            f_score=triplet.F,
         )
 
 
