@@ -1,7 +1,7 @@
 """
 Code for Classifier.
 """
-from .classifier import Classifier, ClassifierResult, ClassifierCallbacks
+from .classifier import Classifier, ClassifierCallbacks, ClassifierResult, NeutrosophicClassifierResult
 
 try:
     from .bedrock_classifier import BedrockClassifier, BedrockClassifierOptions
@@ -24,6 +24,7 @@ except Exception as e:
 __all__ = [
     "Classifier",
     "ClassifierResult",
+    "NeutrosophicClassifierResult",
     'ClassifierCallbacks'
 ]
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from uuid import UUID
 from agent_squad.types import ConversationMessage, TemplateVariables
 from agent_squad.agents import Agent
+from agent_squad.neutrosophic import Triplet
 
 class ClassifierCallbacks():
     async def on_classifier_start(
@@ -33,6 +34,18 @@ class ClassifierCallbacks():
 class ClassifierResult:
     selected_agent: Optional[Agent]
     confidence: float
+
+@dataclass
+class NeutrosophicClassifierResult(ClassifierResult):
+    t_score: float = 0
+    i_score: float = 0
+    f_score: float = 0
+
+    def __post_init__(self) -> None:
+        triplet = Triplet(T=self.t_score, I=self.i_score, F=self.f_score)
+        self.t_score = triplet.T
+        self.i_score = triplet.I
+        self.f_score = triplet.F
 
 class Classifier(ABC):
     def __init__(self):

@@ -1,6 +1,6 @@
 import { AgentOverlapAnalyzer } from "./agentOverlapAnalyzer";
 import { Agent, AgentResponse } from "./agents/agent";
-import { ClassifierResult } from "./classifiers/classifier";
+import { ClassifierResult, NeutrosophicClassifierResult } from "./classifiers/classifier";
 import { ChatStorage } from "./storage/chatStorage";
 import { InMemoryChatStorage } from "./storage/memoryChatStorage";
 import { AccumulatorTransform } from "./utils/helpers";
@@ -8,6 +8,7 @@ import { saveConversationExchange } from "./utils/chatUtils";
 import { Logger } from "./utils/logger";
 import { BedrockClassifier } from "./classifiers/bedrockClassifier";
 import { Classifier } from "./classifiers/classifier";
+import { decide, scoreClassifierConfidence, Triplet } from "./neutrosophic";
 
 export interface AgentSquadConfig {
   /** If true, logs the chat interactions with the agent */
@@ -172,8 +173,8 @@ export interface RequestMetadata {
   sessionId: string;
 
   // Additional parameters or metadata related to the request
-  // Stores string key-value pairs
-  additionalParams: Record<string, string>;
+  // Stores arbitrary key-value metadata.
+  additionalParams: Record<string, any>;
 
   // Optional: Indicates if classification failed during processing
   // Only present if an error occurred during classification
@@ -452,16 +453,20 @@ export class AgentSquad {
     userInput: string,
     userId: string,
     sessionId: string,
-    additionalParams: Record<any, any> = {}
+    additionalParams: Record<any, any> = {},
+    useNeutrosophic = false
   ): Promise<AgentResponse> {
     this.executionTimes = new Map();
 
     try {
-      const classifierResult = await this.classifyRequest(
+      let classifierResult = await this.classifyRequest(
         userInput,
         userId,
         sessionId
       );
+      if (useNeutrosophic) {
+        classifierResult = this.toNeutrosophicClassifierResult(classifierResult);
+      }
 
       if (!classifierResult.selectedAgent) {
         return {
@@ -587,29 +592,85 @@ export class AgentSquad {
     userInput: string,
     userId: string,
     sessionId: string,
-    additionalParams: Record<string, string>
+    additionalParams: Record<string, any>
   ): RequestMetadata {
+    const metadataParams = { ...(additionalParams || {}) };
     const baseMetadata = {
       userInput,
       userId,
       sessionId,
-      additionalParams,
+      additionalParams: metadataParams,
     };
 
     if (!intentClassifierResult || !intentClassifierResult.selectedAgent) {
-      return {
+      const metadata: RequestMetadata = {
         ...baseMetadata,
         agentId: "no_agent_selected",
         agentName: "No Agent",
         errorType: "classification_failed",
       };
+      this.addNeutrosophicMetadata(metadata, intentClassifierResult);
+      return metadata;
     }
 
-    return {
+    const metadata: RequestMetadata = {
       ...baseMetadata,
       agentId: intentClassifierResult.selectedAgent.id,
       agentName: intentClassifierResult.selectedAgent.name,
     };
+    this.addNeutrosophicMetadata(metadata, intentClassifierResult);
+    return metadata;
+  }
+
+  private toNeutrosophicClassifierResult(
+    classifierResult: ClassifierResult
+  ): NeutrosophicClassifierResult {
+    if (this.isNeutrosophicClassifierResult(classifierResult)) {
+      return classifierResult;
+    }
+
+    const triplet = scoreClassifierConfidence(
+      classifierResult.confidence,
+      Boolean(classifierResult.selectedAgent)
+    );
+    return {
+      ...classifierResult,
+      tScore: triplet.T,
+      iScore: triplet.I,
+      fScore: triplet.F,
+    };
+  }
+
+  private addNeutrosophicMetadata(
+    metadata: RequestMetadata,
+    classifierResult: ClassifierResult | null
+  ): void {
+    if (!classifierResult || !this.isNeutrosophicClassifierResult(classifierResult)) {
+      return;
+    }
+
+    const triplet = new Triplet(
+      classifierResult.tScore,
+      classifierResult.iScore,
+      classifierResult.fScore
+    );
+    metadata.additionalParams.neutrosophic = {
+      tScore: triplet.T,
+      iScore: triplet.I,
+      fScore: triplet.F,
+      action: decide(triplet),
+    };
+  }
+
+  private isNeutrosophicClassifierResult(
+    classifierResult: ClassifierResult
+  ): classifierResult is NeutrosophicClassifierResult {
+    const candidate = classifierResult as Partial<NeutrosophicClassifierResult>;
+    return (
+      typeof candidate.tScore === "number" &&
+      typeof candidate.iScore === "number" &&
+      typeof candidate.fScore === "number"
+    );
   }
 
   private getFallbackResult(): ClassifierResult {

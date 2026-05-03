@@ -37,6 +37,7 @@ except ImportError:
     _STRANDS_AGENTS_AVAILABLE = False
 
 from .supervisor_agent import SupervisorAgent, SupervisorAgentOptions
+from .neutrosophic_supervisor import NeutrosophicSupervisor
 
 __all__ = [
     'Agent',
@@ -45,6 +46,7 @@ __all__ = [
     'AgentProcessingResult',
     'AgentResponse',
     'AgentStreamResponse',
+    'NeutrosophicSupervisor',
     'SupervisorAgent',
     'SupervisorAgentOptions'
 ]

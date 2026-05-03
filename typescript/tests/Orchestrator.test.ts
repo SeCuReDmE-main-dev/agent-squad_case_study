@@ -120,6 +120,56 @@ describe('AgentSquad', () => {
     expect(processRequestSpy).toHaveBeenCalled();
   });
 
+  test('routeRequest preserves default metadata when useNeutrosophic is false', async () => {
+    const mockClassifierResult: ClassifierResult = {
+      selectedAgent: mockAgent,
+      confidence: 0.8,
+    };
+
+    mockClassifier.classify.mockResolvedValue(mockClassifierResult);
+    mockStorage.fetchAllChats.mockResolvedValue([]);
+
+    const response = await orchestrator.routeRequest('Test input', 'user1', 'session1');
+
+    expect(response.metadata.additionalParams.neutrosophic).toBeUndefined();
+  });
+
+  test('routeRequest enriches metadata when useNeutrosophic is true', async () => {
+    const mockClassifierResult: ClassifierResult = {
+      selectedAgent: mockAgent,
+      confidence: 0.8,
+    };
+
+    mockClassifier.classify.mockResolvedValue(mockClassifierResult);
+    mockStorage.fetchAllChats.mockResolvedValue([]);
+
+    const response = await orchestrator.routeRequest('Test input', 'user1', 'session1', {}, true);
+
+    expect(response.metadata.additionalParams.neutrosophic.tScore).toBe(0.8);
+    expect(response.metadata.additionalParams.neutrosophic.iScore).toBeCloseTo(0.2);
+    expect(response.metadata.additionalParams.neutrosophic.fScore).toBe(0);
+    expect(response.metadata.additionalParams.neutrosophic.action).toBe('CONFIDENCE');
+  });
+
+  test('routeRequest adds clarification metadata when useNeutrosophic is true and no agent is selected', async () => {
+    mockClassifier.classify.mockResolvedValue({
+      selectedAgent: null,
+      confidence: 0.1,
+    });
+    mockStorage.fetchAllChats.mockResolvedValue([]);
+    (orchestrator as any).config.USE_DEFAULT_AGENT_IF_NONE_IDENTIFIED = false;
+
+    const response = await orchestrator.routeRequest('Test input', 'user1', 'session1', {}, true);
+
+    expect(response.metadata.agentId).toBe('no_agent_selected');
+    expect(response.metadata.additionalParams.neutrosophic).toEqual({
+      tScore: 0,
+      iScore: 0.9,
+      fScore: 0,
+      action: 'CLARIFY',
+    });
+  });
+
 
   test('routeRequest with streaming response', async () => {
     const userInput = 'Stream input';

@@ -266,7 +266,7 @@ abstract processRequest(
   userId: string,
   sessionId: string,
   chatHistory: ConversationMessage[],
-  additionalParams?: Record<string, string>
+  additionalParams?: Record<string, any>
 ): Promise<ConversationMessage | AsyncIterable<any>>;
 
 }

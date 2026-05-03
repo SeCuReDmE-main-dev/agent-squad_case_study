@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, patch, MagicMock
 from agent_squad.types import ConversationMessage, AgentTypes
 from agent_squad.agents import Agent
-from agent_squad.classifiers import Classifier, ClassifierResult
+from agent_squad.classifiers import Classifier, ClassifierResult, NeutrosophicClassifierResult
 import re
 from typing import List, Dict
 import pytest
@@ -139,3 +139,28 @@ class TestClassifier(unittest.TestCase):
 
         # Check that custom variables are included in system prompt
         self.assertIn("Additional context", self.classifier.system_prompt)
+
+
+def test_neutrosophic_classifier_result_validates_scores():
+    result = NeutrosophicClassifierResult(
+        selected_agent=None,
+        confidence=0.4,
+        t_score=0.2,
+        i_score=0.7,
+        f_score=0.1,
+    )
+
+    assert result.t_score == 0.2
+    assert result.i_score == 0.7
+    assert result.f_score == 0.1
+
+
+def test_neutrosophic_classifier_result_rejects_invalid_scores():
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        NeutrosophicClassifierResult(
+            selected_agent=None,
+            confidence=0.4,
+            t_score=1.1,
+            i_score=0.7,
+            f_score=0.1,
+        )

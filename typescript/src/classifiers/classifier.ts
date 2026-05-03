@@ -14,6 +14,12 @@ export interface ClassifierResult {
   confidence: number;
 }
 
+export interface NeutrosophicClassifierResult extends ClassifierResult {
+  tScore: number;
+  iScore: number;
+  fScore: number;
+}
+
 export class ClassifierCallbacks {
     /**
      * Defines callbacks that can be triggered during classifier processing.

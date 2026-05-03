@@ -32,7 +32,7 @@ class RequestMetadata(TypedDict):
     agent_name: str
     user_id: str
     session_id: str
-    additional_params :Optional[dict[str, str]]
+    additional_params :Optional[dict[str, Any]]
     error_type: Optional[str]
 
 
