@@ -27,7 +27,7 @@ describe("neutrosophic benchmark scenarios", () => {
     expect(formalUnion).toEqual(new Triplet(0.92, 0.08, 0.02));
     expect(evidenceFusion.T).toBe(0.92);
     expect(evidenceFusion.F).toBe(0.84);
-    expect(evidenceFusion.I).toBeGreaterThanOrEqual(0.84);
+    expect(evidenceFusion.I).toBe(0.84);
     expect(decide(evidenceFusion)).toBe(DecisionAction.CLARIFY);
   });
 
@@ -43,7 +43,7 @@ describe("neutrosophic benchmark scenarios", () => {
 
     expect(direct.T).toBeGreaterThan(hedged.T);
     expect(hedged.I).toBeGreaterThan(direct.I);
-    expect(refusal.F).toBeGreaterThanOrEqual(0.5);
+    expect(refusal.F).toBeCloseTo(0.92);
     expect(error.F).toBeGreaterThan(direct.F);
     expect(decide(hedged)).toBe(DecisionAction.CLARIFY);
   });

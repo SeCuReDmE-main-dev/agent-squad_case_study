@@ -1,3 +1,5 @@
+import pytest
+
 from agent_squad.neutrosophic import (
     DecisionAction,
     Triplet,
@@ -27,7 +29,7 @@ def test_conflict_preservation_benchmark_separates_formal_union_from_evidence_fu
     assert formal_union == Triplet(T=0.92, I=0.08, F=0.02)
     assert evidence_fusion.T == 0.92
     assert evidence_fusion.F == 0.84
-    assert evidence_fusion.I >= 0.84
+    assert evidence_fusion.I == 0.84
     assert decide(evidence_fusion) == DecisionAction.CLARIFY
 
 
@@ -43,6 +45,6 @@ def test_scorer_calibration_benchmark_keeps_expected_response_bands():
 
     assert direct.T > hedged.T
     assert hedged.I > direct.I
-    assert refusal.F >= 0.5
+    assert refusal.F == pytest.approx(0.92)
     assert error.F > direct.F
     assert decide(hedged) == DecisionAction.CLARIFY
